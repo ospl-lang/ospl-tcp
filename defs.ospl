@@ -18,6 +18,7 @@ def htonl = OSPL_CFFI_Fn libc.htonl (u32) -> u32;
 
 def explode = OSPL_CFFI_Fn libc.exit (u8) -> void;
 
+
 # not serving
 def _socket  = OSPL_CFFI_Fn libc.socket  (i32, i32, i32) -> i32;
 def _connect = OSPL_CFFI_Fn libc.connect (i32, ptr, u32) -> i32;
@@ -28,6 +29,7 @@ def _listen    = OSPL_CFFI_Fn libc.listen   (i32, i32) -> i32;
 def _bind      = OSPL_CFFI_Fn libc.bind     (i32, ptr, u32) -> i32;
 def _accept    = OSPL_CFFI_Fn libc.accept   (i32, ptr, ptr) -> i32;
 def _shutdown  = OSPL_CFFI_Fn libc.shutdown (i32, i32) -> i32;
+def _setsockopt = OSPL_CFFI_Fn libc.setsockopt (i32, i32, i32, ptr, u32) -> i32;
 
 def send = OSPL_CFFI_Fn libc.send (i32, ptr, u64, i32) -> i64;
 def recv = OSPL_CFFI_Fn libc.recv (i32, ptr, u64, i32) -> i64;
@@ -35,6 +37,9 @@ def recv = OSPL_CFFI_Fn libc.recv (i32, ptr, u64, i32) -> i64;
 def AF_INET = 2D;
 def SOCK_STREAM = 1D;
 def INADDR_ANY = 0d;
+
+def SOL_SOCKET = 1d;
+def SO_REUSEADDR = 2d;
 
 def localhost = 2130706433d;
 

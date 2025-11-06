@@ -80,6 +80,11 @@ def TCPServer = obj {
             return null;
         }
 
+        # set SO_REUSEADDR on this socket before use
+        def literally_a_pointer_to_the_number_one_for_no_reason = malloc(4q);
+        OSPL_memcpy literally_a_pointer_to_the_number_one_for_no_reason, 1d;
+        _setsockopt(server.sockfd, SOL_SOCKET, SO_REUSEADDR, literally_a_pointer_to_the_number_one_for_no_reason, 4d);
+
         # INADDR_ANY is also known as 0.0.0.0, or 0x00000000
         server.addr = sockaddr_in_new(AF_INET, port, INADDR_ANY);
 
