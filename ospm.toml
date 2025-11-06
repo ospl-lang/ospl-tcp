@@ -1,0 +1,9 @@
+[package]
+id = "tcp"
+name = "TCP"
+description = "Bindings to libc to support TCP"
+authors = ["Colton Wollinger <cwoll1home@gmail.com>", "ospl <ospllang@gmail.com>"]
+version = "0.1.0"
+
+[ospl]
+version = "0.2.0"
