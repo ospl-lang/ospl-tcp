@@ -1,0 +1,117 @@
+includefile 'defs.ospl';
+def __client = [use 'client.ospl'];
+def TCPClient = __client.TCPClient;
+
+def TCPServer = obj {
+    sockfd: null,
+    addr: null,
+
+    ***** doc
+    calls shutdown() on this socket.
+    Returns `false` if there was an error and `true` otherwise
+    *****
+    shutdown: fn(?me, how) {
+        if _shutdown([@me].sockfd, how) != 0 {
+            return false
+        }
+
+        return true
+    }
+
+    close: fn(?me) {
+        if [@me].sockfd != null {
+            close([@me].sockfd);
+            [@me].sockfd = null;
+        }
+        if [@me].addr != null {
+            free([@me].addr);
+            [@me].addr = null;
+        }
+    },
+
+    _new_connection: fn(client_sockfd, client_address_ptr) {
+        def c = copyof TCPClient;
+        c.sockaddr = client_address_ptr;
+        c.sockfd = client_sockfd;
+        return c;
+    }
+
+    ***** doc
+    waits until a client connection is recieved, then handles this connection.
+    *****
+    serve_once: fn(?me, connection_handler) {
+        # allocate memory for the client address
+        def client_address_ptr = malloc(sockaddr_storage_num_bytes);
+
+        # allocate memory for the address length
+        def addrlen_ptr = malloc(4q);  # sockaddr_t is 32-bit, so four bytes
+        OSPL_memcpy addrlen_ptr, sockaddr_storage_num_bytes_dword;
+
+        def clientfd = _accept([@me].sockfd, client_address_ptr, addrlen_ptr);
+        if clientfd < 0 {
+            return clientfd;
+        }
+
+        # create and handle the connection
+        def tcp_client = [@me]._new_connection(clientfd, client_address_ptr);
+
+        [@connection_handler](me, $tcp_client);  # me is still a reference!
+
+        # end the connection
+        tcp_client.shutdown(TCPClient.SHUT_WR);  # no more writing
+        tcp_client.close();
+
+        return null;
+    }
+
+    serve_forever: fn(?me, connection_handler) {
+        loop {
+            [@me].serve_once(connection_handler);
+        }
+    }
+
+    open: fn(ip: dword, port: word, backlog: DWORD) {
+        def server = copyof TCPServer;
+
+        # initialize our socket
+        server.sockfd = _socket(AF_INET, SOCK_STREAM, 0);
+        if server.sockfd < 0 {
+            server.close();
+            return null;
+        }
+
+        # INADDR_ANY is also known as 0.0.0.0, or 0x00000000
+        server.addr = sockaddr_in_new(AF_INET, port, INADDR_ANY);
+
+        # bind to there and listen
+        if _bind(server.sockfd, server.addr, sockaddr_in_num_bytes_dword) != 0 {
+            server.close();
+            return null;
+        }
+
+        if _listen(server.sockfd, backlog) != 0 {
+            server.close();
+            return null;
+        }
+
+        return server;
+    }
+};
+
+***** example
+def s = TCPServer.open(localhost, 8080w, 2D);
+if s == null {
+    print "failed to connect!\n";
+    explode(1b);
+};
+
+def connection_handler = fn(server, client) {
+    print "new connection!\n";
+    def echo = [@client].recvs(1024q);
+    [@client].sends(echo);
+};
+
+def res = s.serve_forever($connection_handler);
+
+s.close();
+*****

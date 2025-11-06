@@ -1,0 +1,67 @@
+def libc = OSPL_CFFI_Load 'libc.so.6';
+
+***** types
+sa_family_t: u16
+
+sockaddr_in:
+0: sin_family: u16
+2: sin_port: u16
+4: sin_addr: u32
+8: PADDING: u64
+*****
+
+def malloc = OSPL_CFFI_Fn libc.malloc (ptr) -> ptr;
+def free = OSPL_CFFI_Fn libc.free (ptr) -> void;
+
+def htons = OSPL_CFFI_Fn libc.htons (u16) -> u16;
+def htonl = OSPL_CFFI_Fn libc.htonl (u32) -> u32;
+
+def explode = OSPL_CFFI_Fn libc.exit (u8) -> void;
+
+# not serving
+def _socket  = OSPL_CFFI_Fn libc.socket  (i32, i32, i32) -> i32;
+def _connect = OSPL_CFFI_Fn libc.connect (i32, ptr, u32) -> i32;
+def _close   = OSPL_CFFI_Fn libc.close   (i32) -> i32;
+
+# serving
+def _listen    = OSPL_CFFI_Fn libc.listen   (i32, i32) -> i32;
+def _bind      = OSPL_CFFI_Fn libc.bind     (i32, ptr, u32) -> i32;
+def _accept    = OSPL_CFFI_Fn libc.accept   (i32, ptr, ptr) -> i32;
+def _shutdown  = OSPL_CFFI_Fn libc.shutdown (i32, i32) -> i32;
+
+def send = OSPL_CFFI_Fn libc.send (i32, ptr, u64, i32) -> i64;
+def recv = OSPL_CFFI_Fn libc.recv (i32, ptr, u64, i32) -> i64;
+
+def AF_INET = 2D;
+def SOCK_STREAM = 1D;
+def INADDR_ANY = 0d;
+
+def localhost = 2130706433d;
+
+# sockaddr_in defs
+def sockaddr_storage_num_bytes = 128q;
+def sockaddr_storage_num_bytes_dword = 128d;
+def sockaddr_in_num_bytes = 16q;  # 2 + 2 + 4 + 8
+def sockaddr_in_num_bytes_dword = 16d;
+def sockaddr_in_new = fn(sin_family, sin_port, sin_addr) {
+    # allocate new
+    def buff_ptr = malloc(sockaddr_in_num_bytes);
+
+    # now we're gonna do pointer arithmatic
+    def ptr = copyof buff_ptr;
+
+    # sin_family (2 bytes, host order)
+    OSPL_memcpy ptr, sin_family;
+    ptr = ptr + 2q;
+
+    # sin_port (2 bytes, convert to network byte order)
+    OSPL_memcpy ptr, htons(sin_port);
+    ptr = ptr + 2q;
+
+    # sin_addr (4 bytes, convert to network byte order)
+    OSPL_memcpy ptr, htonl(sin_addr);
+    ptr = ptr + 4q;
+
+    # the rest is padding
+    return buff_ptr
+};

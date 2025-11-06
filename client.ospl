@@ -1,0 +1,157 @@
+includefile 'defs.ospl';
+
+# socket defs
+def TCPClient = obj {
+    address: null,
+    port: null,
+
+    sockaddr: null,
+
+    sockfd: null,
+
+    SHUT_RD: 0,
+    SHUT_WR: 1,
+    SHUT_RDWR: 2,
+
+    ***** doc
+    calls shutdown() on this socket.
+    Returns `false` if there was an error and `true` otherwise
+    *****
+    shutdown: fn(?me, how) {
+        if _shutdown([@me].sockfd, how) != 0 {
+            return false
+        }
+
+        return true
+    }
+
+    close: fn(?me) {
+        if [@me].sockfd != null {
+            close([@me].sockfd);
+            [@me].sockfd = null;
+        }
+        if [@me].sockaddr != null {
+            free([@me].sockaddr);
+            [@me].sockaddr = null;
+        }
+    },
+
+    ***** doc
+    reads N characters from the socket
+
+    returns str, or null on error.
+    *****
+    recvs: fn(?me, n: qword) {
+        # call recv
+        def buff_ptr = malloc(n + 1q);
+        def nread = recv([@me].sockfd, buff_ptr, n, 0);
+
+        def last_char = buff_ptr + [nread as qword];
+        OSPL_memcpy [last_char], 0b;  # add null terminator (don't do this... this is stupid)
+
+        def out = buff_ptr asPointerReinterpret str;
+
+        free(buff_ptr);
+        return out
+    }
+
+    ***** doc
+    sends the given tuple reference through the socket.
+    Please note that the elements may only be integer values, NEVER strings!
+    Returns the number of bytes sent as *whatever the fuck libc wants*
+    *****
+    sendb: fn(?me, tup, k: qword) {
+        # compute byte requirements
+        def nmemb = tup.len;
+        def numbytes = nmemb * k;
+
+        # allocate and send
+        def buff_ptr = malloc(numbytes);
+        OSPL_memcpy buff_ptr, tup;
+        def nwritten = send([@me].sockfd, buff_ptr, numbytes, 0);  # flags = 0, we don't need flags
+        free(buff_ptr);
+
+        # return number of bytes sent
+        return nwritten;
+    },
+
+    ***** doc
+    sends the given tuple reference through the socket.
+    Please note that the elements may only be integer values, NEVER strings!
+    Returns the number of bytes sent as *whatever the fuck libc wants*
+    *****
+    sends: fn(?me, s: str) {
+        def tup = s as tuple;
+        return [@me].sendb(tup, 1q);
+    },
+
+    ***** doc
+    opens a new TCP connection on a given address and port.
+    Also preforms the TCP handshake for you
+    *****
+    open: fn(address: dword, port: word) {
+        def s = copyof TCPClient;
+    
+        s.address = address;
+        s.port = port;
+
+        # make a new sockfd
+        s.sockaddr = sockaddr_in_new(AF_INET, port, address);
+        s.sockfd = _socket(AF_INET, SOCK_STREAM, 0);  # protocol 0 is TCP
+
+        # check for failure
+        if _connect(s.sockfd, s.sockaddr, sockaddr_in_num_bytes_dword) != 0 {
+            s.close();
+            return null;
+        };
+
+        # we succeeded yay
+        return s;
+    }
+};
+
+# FIXME: make this function work for ALL IPs...
+def ip4_fields_to_address = fn((a, b, c, d)) {
+    return [a << 24d] || [b << 16d] || [c << 8d] || d;
+};
+
+def ip4_to_sockdata = fn(ip: str) {
+    def strlen = ip.len;
+    def i = 0q;
+
+    def fields = ();
+    def current_field = "";
+    loop {
+        if i >= strlen { break; }
+
+        def ch = ip:[i as str];
+        if ch == "." {
+            fields = fields + current_field as dword;
+            current_field = "";
+        } else {
+            current_field = current_field + ch;
+        };
+
+        i = i + 1q;
+    }
+
+    # add the last field when we break
+    fields = fields + current_field as dword;
+    return ip4_fields_to_address(fields);
+}
+
+***** example
+def ip = localhost;
+def sock = TCPClient.open(ip, 8080w);
+if sock == null {
+    print "Failed to connect!\n"
+    explode(1b);
+} else {
+    print "Opened TCP socket successfully!\n";
+}
+
+sock.sends("GET / HTTP/1.1\n");
+print sock.recvs(20q);
+
+sock.close();
+*****
